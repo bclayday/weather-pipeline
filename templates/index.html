@@ -2,97 +2,396 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Massive Stock Watchlist</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support Desk</title>
   <style>
-    body { font-family: -apple-system, Arial, sans-serif; max-width: 560px; margin: 60px auto; color: #222; }
-    h1 { font-size: 20px; }
-    label { display: block; margin-top: 16px; font-weight: 600; }
-    input[type="text"] { width: 100%; padding: 8px; margin-top: 6px; box-sizing: border-box; }
-    button { margin-top: 16px; padding: 8px 16px; cursor: pointer; }
-    #result { margin-top: 20px; white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 6px; min-height: 20px; }
-    .hint { color: #777; font-size: 13px; margin-top: 4px; }
-    table { width: 100%; margin-top: 24px; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
-    th { font-size: 13px; color: #555; text-transform: uppercase; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: #6366f1;
+      color: white;
+      padding: 20px 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header h1 { font-size: 22px; }
+    .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+    /* Layout */
+    .container { display: flex; max-width: 1200px; margin: 30px auto; gap: 20px; padding: 0 20px; }
+
+    /* Sidebar — ticket list */
+    .sidebar {
+      flex: 1;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      max-height: 75vh;
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sidebar-header h2 { font-size: 16px; }
+    .sidebar-header button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .sidebar-header button:hover { background: #5558e0; }
+
+    /* Ticket item */
+    .ticket-item {
+      padding: 14px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .ticket-item:hover { background: #f8f8ff; }
+    .ticket-item.active { background: #eef0ff; border-left: 3px solid #6366f1; }
+    .ticket-item .t-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .ticket-item .t-meta { font-size: 12px; color: #888; display: flex; gap: 10px; align-items: center; }
+
+    /* Status badges */
+    .badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-open { background: #dbeafe; color: #1e40af; }
+    .badge-in_progress { background: #fef3c7; color: #92400e; }
+    .badge-resolved { background: #d1fae5; color: #065f46; }
+
+    /* Main panel — ticket detail */
+    .main {
+      flex: 2;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      max-height: 75vh;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .main-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-size: 16px;
+      min-height: 300px;
+    }
+    .detail-header { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+    .detail-header h2 { font-size: 20px; margin-bottom: 8px; }
+    .detail-meta { font-size: 13px; color: #888; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+    /* Status selector */
+    .status-select {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Messages */
+    .message {
+      padding: 14px 16px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      max-width: 85%;
+    }
+    .message-them { background: #f0f2f5; }
+    .message-us { background: #eef0ff; margin-left: auto; text-align: right; }
+    .message .msg-author { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    .message .msg-text { font-size: 14px; line-height: 1.5; }
+    .message .msg-time { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+    /* Reply box */
+    .reply-box {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    .reply-box input[type="text"] {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .reply-box input[name="author"] { flex: 0 0 180px; }
+    .reply-box button {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .reply-box button:hover { background: #5558e0; }
+
+    /* Modal — new ticket */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      width: 100%;
+      max-width: 450px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+    }
+    .modal h2 { font-size: 20px; margin-bottom: 20px; }
+    .modal label { display: block; font-size: 13px; font-weight: 600; margin-top: 14px; color: #555; }
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+    .modal-actions button { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; border: none; }
+    .btn-cancel { background: #e5e7eb; color: #444; }
+    .btn-create { background: #6366f1; color: white; }
+    .btn-create:hover { background: #5558e0; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: #aaa; }
   </style>
 </head>
 <body>
-  <h1>Stock Watchlist</h1>
-  <p class="hint">Enter a single ticker symbol. This sends exactly ONE call to the Massive API to fetch the latest price, then adds it to your watchlist.</p>
 
-  <form id="stock-form">
-    <label for="symbol">Ticker symbol</label>
-    <input type="text" id="symbol" name="symbol" placeholder="AAPL" required>
-    <button type="submit">Add to watchlist</button>
-  </form>
+<div class="header">
+  <h1>🎫 Support Desk</h1>
+  <p>Create, track, and resolve support tickets</p>
+</div>
 
-  <div id="result"></div>
+<div class="container">
+  <!-- Ticket list -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Tickets</h2>
+      <button onclick="openModal()">+ New</button>
+    </div>
+    <div id="ticket-list"><div class="loading">Loading tickets…</div></div>
+  </div>
 
-  <table id="watchlist-table">
-    <thead>
-      <tr>
-        <th>Symbol</th>
-        <th>Email</th>
-        <th>Latest price</th>
-        <th>Updated</th>
-      </tr>
-    </thead>
-    <tbody id="watchlist-body"></tbody>
-  </table>
+  <!-- Ticket detail -->
+  <div class="main" id="detail-panel">
+    <div class="main-empty">Select a ticket to view details</div>
+  </div>
+</div>
 
-  <script>
-    const form = document.getElementById("stock-form");
-    const resultEl = document.getElementById("result");
-    const watchlistBody = document.getElementById("watchlist-body");
+<!-- New ticket modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>New Support Ticket</h2>
+    <label for="nt-title">Title</label>
+    <input type="text" id="nt-title" placeholder="Brief description of the issue">
+    <label for="nt-email">Your Email</label>
+    <input type="text" id="nt-email" placeholder="you@example.com">
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-create" onclick="createTicket()">Create Ticket</button>
+    </div>
+  </div>
+</div>
 
-    async function loadWatchlist() {
-      try {
-        const resp = await fetch("/watchlist");
-        const data = await resp.json();
-        if (!resp.ok) {
-          resultEl.textContent = "Error loading watchlist: " + (data.error || resp.statusText);
-          return;
-        }
-        watchlistBody.innerHTML = "";
-        data.forEach((row) => {
-          const tr = document.createElement("tr");
-          const price = row.latest_price !== null && row.latest_price !== undefined
-            ? Number(row.latest_price).toFixed(2)
-            : "-";
-          const updated = row.updated_at ? new Date(row.updated_at).toLocaleString() : "-";
-          tr.innerHTML = `<td>${row.symbol}</td><td>${row.email || "-"}</td><td>${price}</td><td>${updated}</td>`;
-          watchlistBody.appendChild(tr);
-        });
-      } catch (err) {
-        resultEl.textContent = "Failed to load watchlist: " + err;
-      }
+<script>
+  let selectedTicketId = null;
+
+  // ─── Load all tickets ──────────────────────
+  async function loadTickets() {
+    try {
+      const resp = await fetch('/api/tickets');
+      const tickets = await resp.json();
+      renderTicketList(tickets);
+    } catch (err) {
+      document.getElementById('ticket-list').innerHTML = '<div class="loading">Error loading tickets</div>';
     }
+  }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const symbol = document.getElementById("symbol").value;
-      resultEl.textContent = "Adding to watchlist...";
+  function renderTicketList(tickets) {
+    const container = document.getElementById('ticket-list');
+    if (!tickets.length) {
+      container.innerHTML = '<div class="loading">No tickets yet</div>';
+      return;
+    }
+    container.innerHTML = tickets.map(t => `
+      <div class="ticket-item ${t.ticket_id === selectedTicketId ? 'active' : ''}"
+           onclick="selectTicket(${t.ticket_id})">
+        <div class="t-title">${escapeHtml(t.title)}</div>
+        <div class="t-meta">
+          <span class="badge badge-${t.status}">${t.status}</span>
+          <span>#${t.ticket_id}</span>
+          <span>${formatDate(t.created_at)}</span>
+        </div>
+      </div>
+    `).join('');
+  }
 
-      try {
-        const resp = await fetch("/watchlist", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ symbol }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) {
-          resultEl.textContent = "Error: " + (data.error || resp.statusText);
-          return;
-        }
-        resultEl.textContent = "Added " + data.symbol + " at price " + data.latest_price;
-        document.getElementById("symbol").value = "";
-        loadWatchlist();
-      } catch (err) {
-        resultEl.textContent = "Request failed: " + err;
+  // ─── Select & load ticket detail ───────────
+  async function selectTicket(id) {
+    selectedTicketId = id;
+    document.getElementById('detail-panel').innerHTML = '<div class="loading">Loading…</div>';
+    try {
+      const resp = await fetch(`/api/tickets/${id}`);
+      const ticket = await resp.json();
+      renderDetail(ticket);
+      // Refresh sidebar to update active state
+      loadTickets();
+    } catch (err) {
+      document.getElementById('detail-panel').innerHTML = '<div class="loading">Error loading ticket</div>';
+    }
+  }
+
+  function renderDetail(ticket) {
+    const messages = (ticket.messages || []).map(m => {
+      const isSupport = m.author.includes('support');
+      return `
+        <div class="message ${isSupport ? 'message-us' : 'message-them'}">
+          <div class="msg-author">${escapeHtml(m.author)}</div>
+          <div class="msg-text">${escapeHtml(m.message_text)}</div>
+          <div class="msg-time">${formatDate(m.created_at)}</div>
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('detail-panel').innerHTML = `
+      <div class="detail-header">
+        <h2>${escapeHtml(ticket.title)}</h2>
+        <div class="detail-meta">
+          <span class="badge badge-${ticket.status}">${ticket.status}</span>
+          <span>#${ticket.ticket_id}</span>
+          <span>By: ${escapeHtml(ticket.created_by)}</span>
+          <span>${formatDate(ticket.created_at)}</span>
+          <label>
+            Status:
+            <select class="status-select" onchange="updateStatus(${ticket.ticket_id}, this.value)">
+              <option value="open" ${ticket.status === 'open' ? 'selected' : ''}>Open</option>
+              <option value="in_progress" ${ticket.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+              <option value="resolved" ${ticket.status === 'resolved' ? 'selected' : ''}>Resolved</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div id="messages">${messages}</div>
+      <div class="reply-box">
+        <input type="text" id="msg-author" placeholder="Your email" value="${escapeHtml(ticket.created_by)}">
+        <input type="text" id="msg-text" placeholder="Type a reply…" onkeypress="if(event.key==='Enter')addMessage(${ticket.ticket_id})">
+        <button onclick="addMessage(${ticket.ticket_id})">Send</button>
+      </div>
+    `;
+    // Scroll to bottom
+    const panel = document.getElementById('detail-panel');
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  // ─── Create ticket ─────────────────────────
+  function openModal() { document.getElementById('modal').classList.add('show'); }
+  function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+  async function createTicket() {
+    const title = document.getElementById('nt-title').value.trim();
+    const email = document.getElementById('nt-email').value.trim();
+    if (!title || !email) { alert('Title and email are required'); return; }
+
+    try {
+      const resp = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, created_by: email }),
+      });
+      if (resp.ok) {
+        closeModal();
+        document.getElementById('nt-title').value = '';
+        document.getElementById('nt-email').value = '';
+        await loadTickets();
+      } else {
+        const err = await resp.json();
+        alert(err.error || 'Failed to create ticket');
       }
-    });
+    } catch (err) {
+      alert('Network error');
+    }
+  }
 
-    loadWatchlist();
-  </script>
+  // ─── Add message ───────────────────────────
+  async function addMessage(ticketId) {
+    const text = document.getElementById('msg-text').value.trim();
+    const author = document.getElementById('msg-author').value.trim();
+    if (!text || !author) { alert('Message and author are required'); return; }
+
+    try {
+      const resp = await fetch(`/api/tickets/${ticketId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_text: text, author }),
+      });
+      if (resp.ok) {
+        document.getElementById('msg-text').value = '';
+        await selectTicket(ticketId);
+      }
+    } catch (err) {
+      alert('Failed to send message');
+    }
+  }
+
+  // ─── Update status ─────────────────────────
+  async function updateStatus(ticketId, newStatus) {
+    try {
+      const resp = await fetch(`/api/tickets/${ticketId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (resp.ok) {
+        await loadTickets();
+      }
+    } catch (err) {
+      alert('Failed to update status');
+    }
+  }
+
+  // ─── Helpers ───────────────────────────────
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatDate(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // ─── Init ──────────────────────────────────
+  loadTickets();
+</script>
+
 </body>
 </html>
