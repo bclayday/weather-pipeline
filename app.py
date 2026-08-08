@@ -260,6 +260,15 @@ def handle_exception(err):
 # Main
 # ──────────────────────────────────────────────
 
+# ──────────────────────────────────────────────
+# Startup — ensure tables exist and seed data
+# ──────────────────────────────────────────────
+
+# Called at import time so tables + sample data are ready before any
+# request is served.  This runs once per app startup (not per request).
+ensure_tables()
+
+
 if __name__ == "__main__":
     host = os.getenv("FLASK_RUN_HOST", "0.0.0.0")
     port = int(os.getenv("FLASK_RUN_PORT", "8000"))
