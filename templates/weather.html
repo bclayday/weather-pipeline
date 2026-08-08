@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Intelligence</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #1e3a5f, #0c4a6e);
+      padding: 24px 30px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .header h1 { font-size: 24px; color: #38bdf8; }
+    .header p { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+
+    /* Nav tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 0;
+      background: #1e293b;
+      padding: 0 30px;
+      border-bottom: 1px solid #334155;
+    }
+    .nav-tab {
+      padding: 12px 24px;
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .nav-tab:hover { color: #e2e8f0; }
+    .nav-tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+
+    /* Layout */
+    .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+
+    /* Action bar */
+    .action-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .action-bar input[type="text"] {
+      flex: 1;
+      min-width: 250px;
+      padding: 12px 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    .action-bar input[type="text"]::placeholder { color: #64748b; }
+    .action-bar input[type="number"] {
+      width: 80px;
+      padding: 12px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #0ea5e9; color: white; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #3e4f63; }
+    .btn-sync { background: #059669; color: white; }
+    .btn-sync:hover { background: #047857; }
+    .btn-embed { background: #7c3aed; color: white; }
+    .btn-embed:hover { background: #6d28d9; }
+
+    /* Status message */
+    .status-msg {
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .status-msg.show { display: block; }
+    .status-info { background: #0c4a6e; color: #7dd3fc; border: 1px solid #0284c7; }
+    .status-success { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+    .status-error { background: #450a0a; color: #fca5a5; border: 1px solid #dc2626; }
+    .status-loading { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+    /* Locations input */
+    .locations-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      width: 100%;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    .locations-box::placeholder { color: #64748b; }
+
+    /* Section title */
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin: 24px 0 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Results */
+    .results { display: flex; flex-direction: column; gap: 16px; }
+    .result-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px;
+      transition: border-color 0.15s;
+    }
+    .result-card:hover { border-color: #0ea5e9; }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    .result-header h3 {
+      font-size: 16px;
+      color: #e2e8f0;
+    }
+    .result-location {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .similarity-badge {
+      background: #0c4a6e;
+      color: #38bdf8;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .result-chunk {
+      font-size: 14px;
+      color: #cbd5e1;
+      line-height: 1.6;
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 6px;
+      border-left: 3px solid #0ea5e9;
+    }
+
+    /* Pipeline steps */
+    .pipeline {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .pipeline-step {
+      flex: 1;
+      min-width: 200px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .pipeline-step .step-num {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 700;
+    }
+    .pipeline-step .step-title {
+      font-size: 15px;
+      color: #e2e8f0;
+      font-weight: 600;
+      margin: 4px 0;
+    }
+    .pipeline-step .step-desc {
+      font-size: 12px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+    }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #475569; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #334155;
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌤️ Weather Intelligence</h1>
+  <p>Sync NWS alerts → embed → semantic vector search</p>
+</div>
+
+<div class="nav-tabs">
+  <a class="nav-tab" href="/">🎫 Support Desk</a>
+  <a class="nav-tab active" href="/weather">🌤️ Weather</a>
+</div>
+
+<div class="container">
+  <!-- Pipeline overview -->
+  <div class="section-title">Pipeline</div>
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-num">STEP 1</div>
+      <div class="step-title">Sync Alerts</div>
+      <div class="step-desc">Fetch active weather alerts from NWS API and store in Lakebase</div>
+    </div>
+    <div class="pipeline-step">
+      <div class="step-num">STEP 2</div>
+      <div class="step-title">Embed</div>
+      <div class="step-desc">Chunk text and generate 384-dim embeddings with all-MiniLM-L6-v2</div>
+    </div>
+    <div class="pipeline-step">
+      <div class="step-num">STEP 3</div>
+      <div class="step-title">Search</div>
+      <div class="step-desc">Cosine similarity search against pgvector using ↔ operator</div>
+    </div>
+  </div>
+
+  <!-- Sync + Embed controls -->
+  <div class="section-title">Data Ingestion</div>
+  <input type="text" class="locations-box" id="locations" placeholder="Locations (comma-separated), e.g. Huntsville AL, Atlanta GA" value="Huntsville AL, Atlanta GA">
+  <div class="action-bar">
+    <button class="btn btn-sync" onclick="syncWeather()"><span id="sync-text">⬇ Sync NWS Alerts</span></button>
+    <button class="btn btn-embed" onclick="embedWeather()"><span id="embed-text">🧠 Generate Embeddings</span></button>
+  </div>
+  <div class="status-msg" id="status-msg"></div>
+
+  <!-- Search -->
+  <div class="section-title">Semantic Search</div>
+  <div class="action-bar">
+    <input type="text" id="query" placeholder="Search weather alerts... e.g. 'flash flood risk' or 'severe thunderstorm warning'">
+    <input type="number" id="top-k" value="5" min="1" max="20">
+    <button class="btn btn-primary" onclick="searchWeather()">🔍 Search</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="empty-state">
+      <h3>No searches yet</h3>
+      <p>Sync alerts, generate embeddings, then search above</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Show status message
+  function showStatus(type, html) {
+    const el = document.getElementById('status-msg');
+    el.className = `status-msg show status-${type}`;
+    el.innerHTML = html;
+  }
+  function hideStatus() {
+    document.getElementById('status-msg').className = 'status-msg';
+  }
+
+  // Step 1: Sync
+  async function syncWeather() {
+    const locations = document.getElementById('locations').value.trim();
+    const btn = document.getElementById('sync-text');
+    btn.innerHTML = '<span class="spinner"></span> Syncing...';
+
+    try {
+      const resp = await fetch('/weather/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations: locations, limit: 50 }),
+      });
+      const data = await resp.json();
+
+      if (resp.ok) {
+        showStatus('success', `✅ <strong>${data.synced}</strong> weather documents synced from NWS.` +
+          (data.errors && data.errors.length ? ` ${data.errors.length} errors.` : ''));
+      } else {
+        showStatus('error', `❌ ${data.error || 'Sync failed'}`);
+      }
+    } catch (err) {
+      showStatus('error', `❌ Network error: ${err.message}`);
+    }
+    btn.innerHTML = '⬇ Sync NWS Alerts';
+  }
+
+  // Step 2: Embed
+  async function embedWeather() {
+    const btn = document.getElementById('embed-text');
+    btn.innerHTML = '<span class="spinner"></span> Embedding...';
+
+    try {
+      const resp = await fetch('/weather/embed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await resp.json();
+
+      if (resp.ok) {
+        showStatus('success', `✅ Embedded <strong>${data.embedded}</strong> documents into <strong>${data.chunks}</strong> chunks.`);
+      } else {
+        showStatus('error', `❌ ${data.error || 'Embedding failed'}`);
+      }
+    } catch (err) {
+      showStatus('error', `❌ Network error: ${err.message}`);
+    }
+    btn.innerHTML = '🧠 Generate Embeddings';
+  }
+
+  // Step 3: Search
+  async function searchWeather() {
+    const query = document.getElementById('query').value.trim();
+    const topK = parseInt(document.getElementById('top-k').value) || 5;
+
+    if (!query) {
+      showStatus('error', '❌ Please enter a search query');
+      return;
+    }
+
+    const resultsEl = document.getElementById('results');
+    resultsEl.innerHTML = '<div class="empty-state"><span class="spinner"></span> Searching...</div>';
+
+    try {
+      const resp = await fetch('/weather/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, top_k: topK }),
+      });
+      const data = await resp.json();
+
+      if (resp.ok && data.results && data.results.length > 0) {
+        resultsEl.innerHTML = data.results.map(r => `
+          <div class="result-card">
+            <div class="result-header">
+              <div>
+                <h3>${escapeHtml(r.headline || 'Unknown')}</h3>
+                <div class="result-location">📍 ${escapeHtml(r.location || 'Unknown location')}</div>
+              </div>
+              <span class="similarity-badge">${(r.similarity * 100).toFixed(1)}% match</span>
+            </div>
+            <div class="result-chunk">${escapeHtml(r.chunk_text)}</div>
+          </div>
+        `).join('');
+        showStatus('info', `Found <strong>${data.results.length}</strong> matching weather documents.`);
+      } else if (resp.ok && data.results && data.results.length === 0) {
+        resultsEl.innerHTML = '<div class="empty-state"><h3>No results</h3><p>No embeddings found. Make sure you\'ve synced and embedded first.</p></div>';
+        showStatus('info', data.message || 'No results found. Try syncing and embedding first.');
+      } else {
+        resultsEl.innerHTML = '<div class="empty-state"><h3>Error</h3><p>' + escapeHtml(data.error || 'Search failed') + '</p></div>';
+        showStatus('error', `❌ ${data.error || 'Search failed'}`);
+      }
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${err.message}</p></div>`;
+      showStatus('error', `❌ Network error: ${err.message}`);
+    }
+  }
+
+  // Helper
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Enter key triggers search
+  document.getElementById('query').addEventListener('keypress', e => {
+    if (e.key === 'Enter') searchWeather();
+  });
+</script>
+
+</body>
+</html>

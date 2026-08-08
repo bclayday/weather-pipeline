@@ -131,6 +131,12 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/weather")
+def weather_page():
+    """Weather intelligence dashboard."""
+    return render_template("weather.html")
+
+
 # ──────────────────────────────────────────────
 # Routes — API
 # ──────────────────────────────────────────────
