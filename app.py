@@ -127,14 +127,20 @@ def _seed_sample_data():
 
 @app.route("/")
 def index():
-    """Main support ticket dashboard."""
-    return render_template("index.html")
+    """Weather intelligence dashboard (default homepage for this app)."""
+    return render_template("weather.html")
 
 
 @app.route("/weather")
 def weather_page():
     """Weather intelligence dashboard."""
     return render_template("weather.html")
+
+
+@app.route("/support")
+def support_page():
+    """Support ticket dashboard."""
+    return render_template("index.html")
 
 
 # ──────────────────────────────────────────────
