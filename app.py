@@ -7,6 +7,7 @@ Users can view, create, and manage support tickets and messages.
 
 import logging
 import os
+import threading
 
 from databricks.sdk import WorkspaceClient
 from flask import Flask, jsonify, render_template, request
@@ -18,6 +19,24 @@ logger = logging.getLogger("support-app")
 
 app = Flask(__name__)
 _w = WorkspaceClient()
+_weather_model = None
+_weather_model_lock = threading.Lock()
+
+
+def _get_weather_model():
+    """Load the embedding model lazily on first weather-search request."""
+    global _weather_model
+    if _weather_model is None:
+        with _weather_model_lock:
+            if _weather_model is None:
+                from sentence_transformers import SentenceTransformer
+
+                _weather_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    return _weather_model
+
+
+def _vector_literal(values) -> str:
+    return "[" + ",".join(f"{float(value):.12f}" for value in values) + "]"
 
 
 # ──────────────────────────────────────────────
@@ -45,7 +64,6 @@ def ensure_tables():
         )
     """)
 
-    # Seed sample data only if tickets table is empty
     rows = lakebase.run_query("SELECT COUNT(*) AS cnt FROM tickets")
     count = rows[0]["cnt"] if rows else 0
     if count == 0:
@@ -55,7 +73,6 @@ def ensure_tables():
 
 def _seed_sample_data():
     """Insert 3 tickets with 2+ messages each across 3 statuses."""
-    # Ticket 1 — open
     lakebase.run_write(
         "INSERT INTO tickets (title, status, created_by) VALUES (%s, %s, %s)",
         ("Cannot access my account after password reset", "open", "alice@example.com"),
@@ -69,7 +86,6 @@ def _seed_sample_data():
         (1, "Hi Alice, can you try clearing your browser cache and attempting again? Also let us know what browser you are using.", "support@example.com"),
     )
 
-    # Ticket 2 — in_progress
     lakebase.run_write(
         "INSERT INTO tickets (title, status, created_by) VALUES (%s, %s, %s)",
         ("API returning 500 errors intermittently", "in_progress", "bob@example.com"),
@@ -87,7 +103,6 @@ def _seed_sample_data():
         (2, "Update: the bad node has been removed from the pool. Monitoring for further errors.", "support@example.com"),
     )
 
-    # Ticket 3 — resolved
     lakebase.run_write(
         "INSERT INTO tickets (title, status, created_by) VALUES (%s, %s, %s)",
         ("Feature request: dark mode for dashboard", "resolved", "carol@example.com"),
@@ -168,13 +183,11 @@ def create_ticket():
     if not created_by:
         return jsonify({"error": "created_by is required"}), 400
 
-    # Insert the ticket
     lakebase.run_write(
         "INSERT INTO tickets (title, status, created_by) VALUES (%s, %s, %s)",
         (title, "open", created_by),
     )
 
-    # Get the newly created ticket
     rows = lakebase.run_query(
         "SELECT ticket_id, title, status, created_by, created_at FROM tickets ORDER BY ticket_id DESC LIMIT 1"
     )
@@ -193,7 +206,6 @@ def add_message(ticket_id):
     if not author:
         return jsonify({"error": "author is required"}), 400
 
-    # Verify ticket exists
     ticket_rows = lakebase.run_query(
         "SELECT ticket_id FROM tickets WHERE ticket_id = %s",
         (ticket_id,),
@@ -223,7 +235,6 @@ def update_status(ticket_id):
     if new_status not in valid_statuses:
         return jsonify({"error": f"Status must be one of: {', '.join(sorted(valid_statuses))}"}), 400
 
-    # Verify ticket exists
     ticket_rows = lakebase.run_query(
         "SELECT ticket_id FROM tickets WHERE ticket_id = %s",
         (ticket_id,),
@@ -244,6 +255,76 @@ def update_status(ticket_id):
 
 
 # ──────────────────────────────────────────────
+# Routes — Weather API
+# ──────────────────────────────────────────────
+
+@app.route("/weather/sync", methods=["POST"])
+def sync_weather():
+    """Fetch alerts and forecasts for requested locations and upsert them."""
+    from weather_client import DEFAULT_LOCATIONS, sync_locations
+
+    lakebase.ensure_weather_tables()
+    data = request.get_json(silent=True) or {}
+    locations = data.get("locations") or DEFAULT_LOCATIONS
+    limit = data.get("limit", 50)
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 200))
+
+    result = sync_locations(locations=locations, limit=limit)
+    synced = 0
+    for document in result["documents"]:
+        synced += lakebase.upsert_weather_document(document)
+
+    return jsonify({"synced": synced, "errors": result["errors"], "locations": result["requested_locations"]})
+
+
+@app.route("/weather/embed", methods=["POST"])
+def embed_weather():
+    """Trigger embedding generation for unembedded weather documents."""
+    from scripts.ingest_weather_embeddings import ingest_weather_embeddings
+
+    result = ingest_weather_embeddings()
+    return jsonify({"embedded": result["embedded"], "chunks": result["chunks"]})
+
+
+@app.route("/weather/search", methods=["POST"])
+def search_weather():
+    """Semantically search embedded weather chunks."""
+    data = request.get_json(silent=True) or {}
+    query = (data.get("query") or "").strip()
+    if not query:
+        return jsonify({"error": "query is required"}), 400
+
+    try:
+        top_k = int(data.get("top_k", 5))
+    except (TypeError, ValueError):
+        top_k = 5
+    top_k = max(1, min(top_k, 20))
+
+    lakebase.ensure_weather_tables()
+    counts = lakebase.run_query("SELECT COUNT(*) AS cnt FROM weather_embeddings")
+    if not counts or counts[0]["cnt"] == 0:
+        return jsonify({"results": [], "message": "No weather embeddings found yet. Run /weather/sync and /weather/embed first."})
+
+    query_vector = _vector_literal(_get_weather_model().encode(query, normalize_embeddings=True).tolist())
+    rows = lakebase.run_query(
+        """
+        SELECT d.id, d.location, d.headline, d.narrative_text, e.chunk_text,
+               1 - (e.embedding <=> %s::vector) AS similarity
+        FROM weather_embeddings e
+        JOIN weather_documents d ON d.id = e.document_id
+        ORDER BY e.embedding <=> %s::vector
+        LIMIT %s;
+        """,
+        (query_vector, query_vector, top_k),
+    )
+    return jsonify({"results": [dict(row) for row in rows]})
+
+
+# ──────────────────────────────────────────────
 # Error handler
 # ──────────────────────────────────────────────
 
@@ -257,15 +338,9 @@ def handle_exception(err):
 
 
 # ──────────────────────────────────────────────
-# Main
+# Startup
 # ──────────────────────────────────────────────
 
-# ──────────────────────────────────────────────
-# Startup — ensure tables exist and seed data
-# ──────────────────────────────────────────────
-
-# Called at import time so tables + sample data are ready before any
-# request is served.  This runs once per app startup (not per request).
 ensure_tables()
 
 
